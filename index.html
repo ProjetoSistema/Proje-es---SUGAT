@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUGAT - Superintendência de Gestão Ambiental e Territorial</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .transition-all { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 350px;
+            max-height: 400px;
+            margin: 0 auto;
+        }
+
+        .debited-month { background-color: #f1f5f9; color: #94a3b8; text-decoration: line-through; opacity: 0.7; }
+        .chart-value-label { font-size: 8px; font-weight: 800; color: #64748b; margin-bottom: 4px; white-space: nowrap; }
+
+        #loading-overlay {
+            position: fixed; inset: 0; background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px); z-index: 9999;
+            display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1.5rem;
+        }
+
+        .kpi-card { @apply bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm transition-all hover:shadow-md; }
+    </style>
+</head>
+<body class="text-slate-900 antialiased overflow-hidden">
+
+    <!-- Chosen Palette: Strategical Indigo & Warm Slate -->
+    <!-- Application Structure Plan: 
+        1. Filtro Global por Instrumento: No topo da visão geral para isolar dados.
+        2. Breakdown Financeiro por Ação: Soma automática de Budget vs Gasto para o item filtrado.
+        3. Visualização Dinâmica: Gráficos e KPIs que reagem instantaneamente à seleção.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <!-- Overlay de Carregamento -->
+    <div id="loading-overlay">
+        <div class="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <div class="text-center">
+            <p id="loading-text" class="font-bold text-slate-800 text-lg tracking-tight uppercase text-center px-4">Sincronizando SUGAT Cloud</p>
+            <p class="text-slate-400 text-xs mt-1">Ligando ao projeto fiscal-23151...</p>
+        </div>
+    </div>
+
+    <div class="min-h-screen flex">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-900 text-slate-400 hidden md:flex flex-col border-r border-slate-800 shrink-0">
+            <div class="p-8">
+                <div class="flex flex-col gap-1 text-white mb-10">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20 text-white">
+                            <i data-lucide="building-2" size="24"></i>
+                        </div>
+                        <span class="font-black text-2xl tracking-tighter text-white uppercase">SUGAT</span>
+                    </div>
+                    <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2 px-1 text-center leading-tight">Superintendência de Gestão Ambiental e Territorial</p>
+                </div>
+
+                <nav class="space-y-2">
+                    <button onclick="window.navigateTo('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-bold transition-all">
+                        <i data-lucide="layout-dashboard" size="18"></i> Visão Geral
+                    </button>
+                    <button onclick="window.navigateTo('units')" id="nav-units" class="nav-btn w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-bold transition-all hover:bg-slate-800 hover:text-white">
+                        <i data-lucide="briefcase" size="18"></i> Instrumentos
+                    </button>
+                </nav>
+            </div>
+            
+            <div class="mt-auto p-8 border-t border-slate-800/50">
+                <div class="bg-slate-800/40 p-4 rounded-2xl border border-slate-700/30">
+                    <p class="text-[10px] font-black text-slate-500 uppercase mb-3 text-center tracking-widest">Base de Dados Cloud</p>
+                    <div class="flex items-center gap-3">
+                        <div id="connection-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-500 transition-colors"></div>
+                        <div class="overflow-hidden">
+                            <p id="connection-text" class="text-[10px] font-bold text-white uppercase truncate">A conectar...</p>
+                            <p id="sync-info" class="text-[8px] text-slate-500 uppercase">fiscal-23151</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-screen overflow-hidden">
+            <header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-20">
+                <div class="flex items-center gap-4">
+                    <button id="back-btn" onclick="window.goBack()" class="p-2 hover:bg-slate-100 rounded-xl text-slate-500 hidden transition-colors">
+                        <i data-lucide="arrow-left" size="20"></i>
+                    </button>
+                    <div>
+                        <h2 id="header-title" class="text-xl font-black text-slate-800 tracking-tight uppercase">Painel de Controlo</h2>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div class="relative hidden lg:block">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size="16"></i>
+                        <input id="search-input" oninput="window.handleSearch(this.value)" type="text" placeholder="Filtrar instrumentos..." class="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs w-72 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                    </div>
+                    <button onclick="window.openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all active:scale-95">
+                        <i data-lucide="plus-circle" size="16"></i> Novo Registo
+                    </button>
+                </div>
+            </header>
+
+            <div id="content-area" class="flex-1 overflow-y-auto p-8 bg-slate-50/50 scroll-smooth custom-scrollbar">
+                <!-- Visão Dashboard -->
+                <div id="view-dashboard" class="max-w-7xl mx-auto space-y-8 fade-in">
+                    
+                    <!-- Filtro por Instrumento no Dashboard -->
+                    <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div class="flex items-center gap-4">
+                            <div class="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+                                <i data-lucide="filter" size="20"></i>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Análise de Foco</p>
+                                <h3 class="text-lg font-bold text-slate-800">Filtrar Visão Geral</h3>
+                            </div>
+                        </div>
+                        <div class="w-full md:w-96">
+                            <select id="dashboard-instrument-filter" onchange="window.renderDashboard()" class="w-full px-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer">
+                                <option value="all">Todos os Instrumentos</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+                    
+                    <!-- Breakdown por Ação Orçamentária (Visível ao filtrar) -->
+                    <div id="action-breakdown-container" class="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm hidden fade-in">
+                        <div class="flex items-center justify-between mb-8">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-slate-900 rounded-xl text-white">
+                                    <i data-lucide="layers" size="18"></i>
+                                </div>
+                                <h3 class="text-xl font-black text-slate-800 tracking-tight">Breakdown por Ação Orçamentária</h3>
+                            </div>
+                        </div>
+                        <div id="action-breakdown-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+                            <div>
+                                <h3 class="text-xl font-black text-slate-800 tracking-tight">Fluxo de Desembolso</h3>
+                                <p class="text-xs text-slate-400 mt-1 italic font-medium">Consolidado plurianual 2025-2030</p>
+                            </div>
+                            <div class="flex bg-slate-100 p-1.5 rounded-2xl">
+                                <button onclick="window.setChartMode('annual')" id="btn-annual" class="px-5 py-2 rounded-xl text-[10px] font-black transition-all bg-white shadow-sm text-indigo-600 uppercase tracking-widest">Anual</button>
+                                <button onclick="window.setChartMode('monthly')" id="btn-monthly" class="px-5 py-2 rounded-xl text-[10px] font-black transition-all text-slate-500 uppercase tracking-widest">Mensal</button>
+                                <select id="chart-year-select" onchange="window.updateChartYear(this.value)" class="bg-transparent border-none text-[10px] font-black text-slate-500 px-2 outline-none cursor-pointer"></select>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="mainChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visão Listagem -->
+                <div id="view-units" class="max-w-7xl mx-auto space-y-8 hidden fade-in">
+                    <div class="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-50/50 text-[10px] uppercase font-black text-slate-400 tracking-widest border-b">
+                                    <tr>
+                                        <th class="px-10 py-6">Instrumento / Contratada</th>
+                                        <th class="px-6 py-6 text-center">Status</th>
+                                        <th class="px-6 py-6 text-center">Ação Orçamental</th>
+                                        <th class="px-6 py-6 text-right">Debitado (YTD)</th>
+                                        <th class="px-6 py-6 text-right">Budget Consolidado</th>
+                                        <th class="px-10 py-6 text-center">Gestão</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="units-table-body" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visão Detalhada -->
+                <div id="view-detail" class="max-w-7xl mx-auto hidden fade-in space-y-8"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Form -->
+    <div id="modal-container" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-[48px] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col scale-95 animate-in zoom-in duration-300">
+            <div class="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <div>
+                    <h2 id="modal-title" class="text-2xl font-black text-slate-800 tracking-tighter uppercase">Instrumento</h2>
+                    <p class="text-sm text-slate-500 font-medium italic">Dados sincronizados em tempo real.</p>
+                </div>
+                <button onclick="window.closeModal()" class="p-3 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
+                    <i data-lucide="x" size="24"></i>
+                </button>
+            </div>
+
+            <div id="modal-content" class="flex-1 overflow-y-auto p-12 custom-scrollbar bg-slate-50/10">
+                <div id="step-1" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nº Instrumento</label>
+                        <select id="form-name" onchange="window.handleInstrumentChange(this.value)" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all">
+                            <option value="">Selecione...</option>
+                            <option value="032/2013">032/2013</option><option value="016/2015">016/2015</option>
+                            <option value="017/2015">017/2015</option><option value="011/2018">011/2018</option>
+                            <option value="014/2021">014/2021</option><option value="016/2021">016/2021</option>
+                            <option value="017/2021">017/2021</option><option value="025/2021">025/2021</option>
+                            <option value="012/2022">012/2022</option><option value="013/2022">013/2022</option>
+                            <option value="021/2024">021/2024</option><option value="037/2024">037/2024</option>
+                            <option value="006/2025">006/2025</option><option value="007/2025">007/2025</option>
+                            <option value="010/2025">010/2025</option><option value="Inex 012/2025">Inex 012/2025</option>
+                            <option value="017/2025">017/2025</option><option value="026/2025">026/2025</option>
+                            <option value="027/2025">027/2025</option><option value="029/2025">029/2025</option>
+                            <option value="TED 002/2025">TED 002/2025</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contratada</label>
+                        <input id="form-cat" type="text" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Auto-preenchimento">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gerência</label>
+                        <select id="form-management" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500">
+                            <option value="GEMAB">GEMAB</option>
+                            <option value="GEVTEA">GEVTEA</option>
+                            <option value="GGI">GGI</option>
+                            <option value="GEDAF">GEDAF</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Atual</label>
+                        <select id="form-status" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all">
+                            <option value="Ativo">Ativo</option><option value="Em Encerramento">Em Encerramento</option><option value="A Contratar">A Contratar</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ação Orçamentária</label>
+                        <input id="form-action" type="text" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Ex: 124G">
+                    </div>
+                    <div class="space-y-2 relative">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">DDO Estimado</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
+                            <input id="form-ddo" type="text" oninput="window.handleCurrencyInput(this)" class="w-full pl-12 pr-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500" placeholder="0,00">
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gestor Titular</label>
+                        <input id="form-resp" type="text" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Nome Completo">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gestor Substituto</label>
+                        <input id="form-sub-resp" type="text" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Nome Completo">
+                    </div>
+                </div>
+
+                <div id="step-2" class="space-y-10 hidden text-center">
+                    <div class="flex items-center justify-between p-6 bg-indigo-50 border border-indigo-100 rounded-[24px] sticky top-0 z-10 shadow-sm">
+                        <div class="flex-1">
+                            <p class="text-xs font-black uppercase tracking-widest text-indigo-900 mb-2">Ano para Lançamento de Desembolsos:</p>
+                            <select id="form-modal-year-select" onchange="window.changeModalEditingYear(this.value)" class="w-full md:w-48 px-5 py-3 bg-white border border-indigo-200 rounded-xl outline-none font-black text-indigo-600 focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm mx-auto block"></select>
+                        </div>
+                    </div>
+                    <div id="monthly-inputs-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 text-slate-800 pb-8 text-left"></div>
+                </div>
+            </div>
+
+            <div class="p-10 border-t border-slate-100 flex justify-between bg-slate-50/50 shrink-0">
+                <button onclick="window.closeModal()" class="px-8 py-3 text-sm font-black text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">Cancelar</button>
+                <div class="flex gap-4">
+                   <button id="modal-back-btn" onclick="window.modalPrevStep()" class="hidden items-center gap-2 px-8 py-3 border border-slate-200 rounded-2xl text-sm font-bold text-slate-500 hover:bg-white transition-all uppercase">Voltar</button>
+                   <button id="modal-next-btn" onclick="window.modalNextStep()" class="bg-indigo-600 text-white px-12 py-3 rounded-2xl text-sm font-black hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all uppercase">Próxima Etapa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // CONFIGURAÇÃO
+        const firebaseConfig = {
+            apiKey: "AIzaSyCUG2O3BXWBbaBH4CFLRq4HTk431kdWVp0",
+            authDomain: "fiscal-23151.firebaseapp.com",
+            databaseURL: "https://fiscal-23151-default-rtdb.firebaseio.com",
+            projectId: "fiscal-23151",
+            storageBucket: "fiscal-23151.firebasestorage.app",
+            messagingSenderId: "852461389941",
+            appId: "1:852461389941:web:c535d25266062f17fa103c",
+            measurementId: "G-9BJ7HRGQR2"
+        };
+
+        const appId = 'sugat-territorial-cloud';
+        let db, auth, mainChart;
+        
+        // --- ESTADO GLOBAL ---
+        window.units = [];
+        window.filteredUnits = [];
+        window.currentProjectionsEdit = {};
+        window.currentView = 'dashboard';
+        window.chartMode = 'annual';
+        window.chartYear = 2026;
+        window.formStep = 1;
+        window.modalEditingYear = 2026;
+        window.editingId = null;
+        window.selectedUnit = null;
+        window.currentUser = null;
+        window.isFirebaseInit = false;
+
+        const YEARS = [2025, 2026, 2027, 2028, 2029, 2030];
+        const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const CURRENT_YEAR = 2026;
+        const CURRENT_MONTH_IDX = 0;
+
+        const MAPPING = {
+            "032/2013": "PROSUL PROJETOS SUPERVISAO E PLANEJAMENTO",
+            "016/2015": "M R S ESTUDOS AMBIENTAIS", "017/2015": "M R S ESTUDOS AMBIENTAIS",
+            "011/2018": "Consórcio Egis-Engemim", "014/2021": "FUNDACAO AROEIRA", "016/2021": "SKILL ENGENHARIA",
+            "017/2021": "PROSUL PROJETOS", "025/2021": "Consórcio HE Espeleológico", "012/2022": "HABILIS CONSULTORIA",
+            "013/2022": "CONSORCIO ECOPLAN-SKILL-CELTES", "021/2024": "CONSORCIO INFRA GAT",
+            "037/2024": "ENPROL ENGENHARIA", "006/2025": "M R S ESTUDOS AMBIENTAIS",
+            "007/2025": "M R S ESTUDOS AMBIENTAIS", "010/2025": "ASTEC",
+            "Inex 012/2025": "CORTEX AMERICAS", "017/2025": "FGV",
+            "026/2025": "Consórcio ESPELCON-INFRA", "027/2025": "FUNDAÇÃO AROEIRA",
+            "029/2025": "FIA", "TED 002/2025": "INPA"
+        };
+
+        if (firebaseConfig.apiKey) {
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            window.isFirebaseInit = true;
+        }
+
+        // --- FUNÇÕES CORE ---
+
+        function populateYearSelects() {
+            const ds = document.getElementById('chart-year-select');
+            if (ds) ds.innerHTML = YEARS.map(y => `<option value="${y}" ${y === window.chartYear ? 'selected' : ''}>${y}</option>`).join('');
+            const ms = document.getElementById('form-modal-year-select');
+            if (ms) ms.innerHTML = YEARS.map(y => `<option value="${y}" ${y === window.modalEditingYear ? 'selected' : ''}>Ano ${y}</option>`).join('');
+        }
+
+        function resetTempProjections() {
+            window.currentProjectionsEdit = YEARS.reduce((acc, y) => { acc[y] = Array(12).fill(0); return acc; }, {});
+        }
+
+        window.populateYearSelects = populateYearSelects;
+        window.resetTempProjections = resetTempProjections;
+
+        window.formatBRL = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+        window.formatBRLTable = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+        
+        window.maskCurrency = (v) => {
+            if (!v && v !== 0) return "0,00";
+            let clean = v.toString().replace(/\D/g, "");
+            let num = parseInt(clean) || 0;
+            clean = num.toString().padStart(3, "0");
+            let intPart = clean.slice(0, -2);
+            let decPart = clean.slice(-2);
+            if (intPart.length > 1) intPart = parseInt(intPart).toString();
+            intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            return `${intPart},${decPart}`;
+        };
+
+        window.parseCurrency = (v) => {
+            if (!v) return 0;
+            let clean = v.toString().replace(/\./g, "").replace(",", ".");
+            return parseFloat(clean) || 0;
+        };
+
+        window.handleCurrencyInput = (i) => {
+            let pos = i.selectionStart, oldLen = i.value.length;
+            i.value = window.maskCurrency(i.value);
+            i.setSelectionRange(pos + (i.value.length - oldLen), pos + (i.value.length - oldLen));
+        };
+
+        window.handleMonthInput = (idx, i) => {
+            window.handleCurrencyInput(i);
+            window.currentProjectionsEdit[window.modalEditingYear][idx] = window.parseCurrency(i.value);
+        };
+
+        window.handleInstrumentChange = (v) => { 
+            const el = document.getElementById('form-cat');
+            if (el) el.value = MAPPING[v] || ""; 
+        };
+
+        window.navigateTo = (v) => {
+            window.currentView = v;
+            document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(`view-${v}`);
+            if (target) target.classList.remove('hidden');
+            
+            document.getElementById('nav-dashboard').classList.toggle('bg-indigo-600', v === 'dashboard');
+            document.getElementById('nav-dashboard').classList.toggle('text-white', v === 'dashboard');
+            document.getElementById('nav-units').classList.toggle('bg-indigo-600', v === 'units');
+            document.getElementById('nav-units').classList.toggle('text-white', v === 'units');
+            
+            document.getElementById('back-btn').classList.toggle('hidden', v !== 'detail');
+            document.getElementById('header-title').innerText = v === 'dashboard' ? 'PAINEL DE CONTROLO SUGAT' : (v === 'units' ? 'INSTRUMENTOS ADMINISTRATIVOS' : 'FICHA DETALHADA');
+            
+            if(v === 'dashboard') window.renderDashboard();
+            if(v === 'units') window.renderList();
+            lucide.createIcons();
+        };
+
+        window.renderDashboard = () => {
+            const filterVal = document.getElementById('dashboard-instrument-filter').value;
+            
+            // 1. Filtrar os dados baseado na seleção
+            let dashboardUnits = window.units;
+            if (filterVal !== 'all') {
+                dashboardUnits = window.units.filter(u => u.nome === filterVal);
+                document.getElementById('action-breakdown-container').classList.remove('hidden');
+            } else {
+                document.getElementById('action-breakdown-container').classList.add('hidden');
+            }
+
+            // 2. Calcular Totais Globais ou Filtrados e Agrupar por Ação
+            let total = 0, debited = 0;
+            let actionsMap = {}; 
+
+            dashboardUnits.forEach(u => {
+                let unitTotal = 0;
+                let unitDebited = 0;
+                let action = u.acaoOrcamentaria || "Não Atribuída";
+
+                YEARS.forEach(y => {
+                    const yr = u.projections[y] || Array(12).fill(0);
+                    const yrTotal = yr.reduce((a,b)=>a+b,0);
+                    unitTotal += yrTotal;
+                    
+                    let yrDebited = 0;
+                    if(y < CURRENT_YEAR) yrDebited = yrTotal;
+                    else if(y === CURRENT_YEAR) { for(let i=0; i<CURRENT_MONTH_IDX; i++) yrDebited += yr[i]; }
+                    unitDebited += yrDebited;
+                });
+
+                total += unitTotal;
+                debited += unitDebited;
+
+                // Acumular por Ação Orçamentária
+                if (!actionsMap[action]) actionsMap[action] = { budget: 0, gasto: 0 };
+                actionsMap[action].budget += unitTotal;
+                actionsMap[action].gasto += unitDebited;
+            });
+
+            // 3. Renderizar KPIs
+            const grid = document.getElementById('metrics-grid');
+            if (grid) grid.innerHTML = `
+                <div class="kpi-card"><div class="p-3 rounded-2xl bg-slate-900 text-white w-max mb-4 shadow-lg"><i data-lucide="dollar-sign"></i></div><p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Budget Plurianual</p><p class="text-2xl font-black text-slate-900 mt-1">${window.formatBRL(total)}</p></div>
+                <div class="kpi-card border-rose-100 bg-rose-50/30"><div class="p-3 rounded-2xl bg-rose-600 text-white w-max mb-4 shadow-lg"><i data-lucide="arrow-down-to-dot"></i></div><p class="text-rose-600 text-xs font-bold uppercase tracking-widest">Total Debitado</p><p class="text-2xl font-black text-rose-900 mt-1">${window.formatBRL(debited)}</p></div>
+                <div class="kpi-card border-emerald-100 bg-emerald-50/30"><div class="p-3 rounded-2xl bg-emerald-600 text-white w-max mb-4 shadow-lg"><i data-lucide="landmark"></i></div><p class="text-emerald-600 text-xs font-bold uppercase tracking-widest">Saldo Restante</p><p class="text-2xl font-black text-emerald-900 mt-1">${window.formatBRL(total - debited)}</p></div>
+                <div class="kpi-card"><div class="p-3 rounded-2xl bg-indigo-600 text-white w-max mb-4 shadow-lg"><i data-lucide="briefcase"></i></div><p class="text-slate-400 text-xs font-bold uppercase tracking-widest">${filterVal === 'all' ? 'Instrumentos Únicos' : 'Status Instrumento'}</p><p class="text-2xl font-black text-slate-900 mt-1">${filterVal === 'all' ? new Set(window.units.map(u => u.nome)).size : (dashboardUnits[0]?.status || '-')}</p></div>
+            `;
+
+            // 4. Renderizar Breakdown por Ação (Apenas se houver um filtro específico ou para todos)
+            const breakdownList = document.getElementById('action-breakdown-list');
+            if (breakdownList) {
+                breakdownList.innerHTML = Object.keys(actionsMap).map(acao => `
+                    <div class="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-black text-indigo-600 uppercase tracking-tighter">${acao}</span>
+                            <i data-lucide="tag" size="14" class="text-slate-400"></i>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Soma Total da Ação</p>
+                                <p class="text-lg font-black text-slate-800 leading-none">${window.formatBRL(actionsMap[acao].budget)}</p>
+                            </div>
+                            <div class="pt-3 border-t border-slate-200">
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Gasto (Debitado)</p>
+                                <p class="text-lg font-black text-rose-500 leading-none">${window.formatBRL(actionsMap[acao].gasto)}</p>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            window.renderChart(dashboardUnits);
+            lucide.createIcons();
+        };
+
+        window.renderChart = (customUnits = null) => {
+            const chartUnits = customUnits || window.units;
+            const canvas = document.getElementById('mainChart');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let labels, dataPoints;
+            if (window.chartMode === 'annual') {
+                labels = YEARS;
+                dataPoints = YEARS.map(y => chartUnits.reduce((acc, u) => acc + (u.projections[y] || Array(12).fill(0)).reduce((s, m) => s + m, 0), 0));
+            } else {
+                labels = MONTHS;
+                dataPoints = Array(12).fill(0).map((_, i) => chartUnits.reduce((acc, u) => acc + (u.projections[window.chartYear] ? u.projections[window.chartYear][i] : 0), 0));
+            }
+            if(mainChart) mainChart.destroy();
+            mainChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'BRL',
+                        data: dataPoints,
+                        backgroundColor: dataPoints.map((_, i) => (window.chartMode === 'annual' ? YEARS[i] < CURRENT_YEAR : (window.chartYear < CURRENT_YEAR || (window.chartYear === CURRENT_YEAR && i < CURRENT_MONTH_IDX))) ? '#cbd5e1' : '#4f46e5'),
+                        borderRadius: 12
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: (v) => window.formatBRL(v) } }, x: { grid: { display: false } } }
+                }
+            });
+        };
+
+        window.renderList = () => {
+            const tbody = document.getElementById('units-table-body');
+            const empty = document.getElementById('units-empty-state');
+            if (empty) empty.classList.toggle('hidden', window.units.length > 0);
+            if (!tbody) return;
+            tbody.innerHTML = window.filteredUnits.map(u => {
+                let total = 0, debited = 0;
+                YEARS.forEach(y => {
+                    const yr = u.projections[y] || Array(12).fill(0);
+                    total += yr.reduce((a,b)=>a+b,0);
+                    if(y < CURRENT_YEAR) debited += yr.reduce((a,b)=>a+b,0);
+                    else if(y === CURRENT_YEAR) { for(let i=0; i<CURRENT_MONTH_IDX; i++) debited += yr[i]; }
+                });
+                const statusColor = u.status === 'Ativo' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700';
+                return `<tr class="group hover:bg-slate-50 transition-all cursor-pointer">
+                    <td onclick="window.showDetail('${u.id}')" class="px-10 py-6"><p class="text-sm font-black text-slate-900 uppercase tracking-tight">${u.nome}</p><p class="text-[10px] text-slate-400 font-bold uppercase">${u.categoria || '-'}</p></td>
+                    <td onclick="window.showDetail('${u.id}')" class="px-6 py-6 text-center"><span class="px-3 py-1 rounded-full text-[9px] font-black uppercase border ${statusColor} border-slate-100">${u.status}</span></td>
+                    <td onclick="window.showDetail('${u.id}')" class="px-6 py-6 text-center"><span class="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-600 border border-slate-200 uppercase">${u.acaoOrcamentaria || '-'}</span></td>
+                    <td onclick="window.showDetail('${u.id}')" class="px-6 py-6 text-right font-black text-rose-500">${window.formatBRL(debited)}</td>
+                    <td onclick="window.showDetail('${u.id}')" class="px-6 py-6 text-right text-base font-black text-indigo-600">${window.formatBRL(total)}</td>
+                    <td class="px-10 py-6 text-center"><div class="flex items-center justify-center gap-2">
+                        <button onclick="window.openModal('${u.id}')" class="p-2 bg-slate-100 text-slate-400 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm"><i data-lucide="edit-3" size="16"></i></button>
+                        <button onclick="window.deleteUnit('${u.id}')" class="p-2 bg-slate-100 text-slate-400 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm"><i data-lucide="trash-2" size="16"></i></button>
+                    </div></td></tr>`;
+            }).join('');
+            lucide.createIcons();
+        };
+
+        window.showDetail = (id) => {
+            window.selectedUnit = window.units.find(u => u.id === id);
+            window.navigateTo('detail');
+            const view = document.getElementById('view-detail');
+            if(!view) return;
+            let total = 0, debited = 0;
+            YEARS.forEach(y => {
+                const yr = window.selectedUnit.projections[y] || Array(12).fill(0);
+                total += yr.reduce((a,b)=>a+b,0);
+                if(y < CURRENT_YEAR) debited += yr.reduce((a,b)=>a+b,0);
+                else if(y === CURRENT_YEAR) { for(let i=0; i<CURRENT_MONTH_IDX; i++) debited += yr[i]; }
+            });
+            let tableRows = YEARS.map(year => {
+                const yr = window.selectedUnit.projections[year] || Array(12).fill(0);
+                let cells = yr.map((m, idx) => `<td class="text-right text-xs font-medium px-4 py-3 border-r ${ (year < CURRENT_YEAR || (year === CURRENT_YEAR && idx < CURRENT_MONTH_IDX)) ? 'debited-month' : 'text-slate-600'}">${window.formatBRLTable(m)}</td>`).join('');
+                return `<tr class="hover:bg-slate-50 border-b"><td class="sticky left-0 bg-white z-10 px-6 py-4 font-black text-slate-800 border-r">${year}</td>${cells}<td class="text-right px-6 py-4 font-black text-indigo-600 bg-indigo-50/30">${window.formatBRL(yr.reduce((a,b)=>a+b,0))}</td></tr>`;
+            }).join('');
+            view.innerHTML = `
+                <div class="bg-white rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden mb-8 fade-in text-left">
+                    <div class="bg-slate-900 p-12 text-white relative">
+                        <div class="flex flex-col md:flex-row justify-between items-end gap-8 relative z-10">
+                            <div class="flex-1 w-full text-left">
+                                <div class="flex gap-2 mb-4"><span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase bg-emerald-500 text-white">${window.selectedUnit.status}</span>
+                                <button onclick="window.openModal('${window.selectedUnit.id}')" class="flex items-center gap-2 px-4 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-[10px] font-bold uppercase transition-all ml-4"><i data-lucide="edit-3" size="14"></i> Editar</button></div>
+                                <h1 class="text-4xl font-black tracking-tighter uppercase mb-8">${window.selectedUnit.nome}</h1>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-slate-300">
+                                    <div class="font-bold text-xs flex items-center gap-2 uppercase tracking-widest border-l-4 border-rose-500 pl-3 py-1 text-left">Total Debitado: <span class="text-white ml-2 font-black">${window.formatBRLTable(debited)}</span></div>
+                                    <div class="font-bold text-xs flex items-center gap-2 uppercase tracking-widest leading-none border-l-4 border-emerald-500 pl-3 py-1 text-left">Saldo Restante: <span class="text-white ml-2 font-black">${window.formatBRLTable(total - debited)}</span></div>
+                                </div>
+                            </div>
+                            <div class="bg-white/10 backdrop-blur-xl p-10 rounded-[32px] border border-white/10 text-right min-w-[280px]">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Budget Consolidado</p>
+                                <p class="text-4xl font-black">${window.formatBRL(total)}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden fade-in"><div class="overflow-x-auto custom-scrollbar"><table class="w-full text-left projection-table border-collapse"><thead class="bg-slate-50/80 text-[10px] uppercase font-black text-slate-400 tracking-widest border-b"><tr><th class="sticky left-0 bg-slate-50 z-20 px-6 py-4 border-r">Ano</th>${MONTHS.map(m => `<th class="px-4 py-4 text-right border-r">${m}</th>`).join('')}<th class="px-6 py-4 text-right bg-indigo-50/50">Total</th></tr></thead><tbody>${tableRows}</tbody></table></div></div>`;
+            lucide.createIcons();
+        };
+
+        window.openModal = (id = null) => {
+            const container = document.getElementById('modal-container');
+            if (container) { container.classList.remove('hidden'); container.classList.add('flex'); }
+            window.formStep = 1; window.editingId = id;
+            if (id) {
+                const u = window.units.find(u => u.id === id);
+                if (u) {
+                    document.getElementById('form-name').value = u.nome; document.getElementById('form-cat').value = u.categoria;
+                    document.getElementById('form-status').value = u.status; document.getElementById('form-action').value = u.acaoOrcamentaria; 
+                    
+                    const ddoEl = document.getElementById('form-ddo');
+                    if(ddoEl) ddoEl.value = window.maskCurrency(u.ddo);
+                    
+                    const mgEl = document.getElementById('form-management');
+                    if(mgEl) mgEl.value = u.gerencia || "GEMAB";
+                    
+                    const respEl = document.getElementById('form-resp');
+                    if(respEl) respEl.value = u.responsavel || "";
+                    
+                    const subEl = document.getElementById('form-sub-resp');
+                    if(subEl) subEl.value = u.responsavelSub || "";
+
+                    window.currentProjectionsEdit = JSON.parse(JSON.stringify(u.projections));
+                }
+            } else {
+                document.getElementById('form-name').value = ''; document.getElementById('form-cat').value = '';
+                document.getElementById('form-ddo').value = '0,00'; document.getElementById('form-action').value = '';
+                
+                const mgEl = document.getElementById('form-management');
+                if(mgEl) mgEl.value = "GEMAB";
+                
+                const respEl = document.getElementById('form-resp');
+                if(respEl) respEl.value = "";
+                
+                const subEl = document.getElementById('form-sub-resp');
+                if(subEl) subEl.value = "";
+
+                window.resetTempProjections();
+            }
+            window.updateModalView();
+        };
+
+        window.closeModal = () => { const el = document.getElementById('modal-container'); if (el) { el.classList.add('hidden'); el.classList.remove('flex'); } window.editingId = null; };
+
+        window.updateModalView = () => {
+            const s1 = document.getElementById('step-1'); const s2 = document.getElementById('step-2');
+            const bk = document.getElementById('modal-back-btn'); const nx = document.getElementById('modal-next-btn');
+            if(s1) s1.classList.toggle('hidden', window.formStep !== 1);
+            if(s2) s2.classList.toggle('hidden', window.formStep !== 2);
+            if(bk) bk.classList.toggle('hidden', window.formStep === 1);
+            if(nx) nx.innerText = window.formStep === 1 ? 'Próxima Etapa' : 'Guardar Dados';
+            if(window.formStep === 2) { window.populateYearSelects(); window.renderMonthlyInputs(); }
+            lucide.createIcons();
+        };
+
+        window.modalNextStep = () => { if (window.formStep === 1) { window.formStep = 2; window.updateModalView(); } else { window.saveUnit(); } };
+        window.modalPrevStep = () => { window.formStep = 1; window.updateModalView(); };
+
+        window.renderMonthlyInputs = () => {
+            const grid = document.getElementById('monthly-inputs-grid'); if(!grid) return;
+            const data = window.currentProjectionsEdit[window.modalEditingYear] || Array(12).fill(0);
+            grid.innerHTML = MONTHS.map((m, idx) => `
+                <div class="space-y-2"><label class="text-[10px] font-black text-slate-400 uppercase tracking-wider text-center block">${m}</label>
+                <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">R$</span>
+                <input type="text" oninput="window.handleMonthInput(${idx}, this)" class="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="${window.maskCurrency(data[idx])}"></div></div>`).join('');
+        };
+
+        window.changeModalEditingYear = (y) => { window.modalEditingYear = parseInt(y); window.renderMonthlyInputs(); };
+
+        window.saveUnit = async () => {
+            const btn = document.getElementById('modal-next-btn');
+            const originalText = btn.innerText;
+            btn.innerText = "Sincronizando..."; btn.disabled = true;
+
+            const data = {
+                id: window.editingId || (Date.now().toString()),
+                nome: document.getElementById('form-name').value, 
+                categoria: document.getElementById('form-cat').value,
+                gerencia: document.getElementById('form-management').value,
+                status: document.getElementById('form-status').value, 
+                acaoOrcamentaria: document.getElementById('form-action').value, 
+                ddo: window.parseCurrency(document.getElementById('form-ddo').value),
+                responsavel: document.getElementById('form-resp').value,
+                responsavelSub: document.getElementById('form-sub-resp').value,
+                projections: window.currentProjectionsEdit, 
+                updatedAt: new Date().toISOString()
+            };
+
+            try {
+                if (window.isFirebaseInit && window.currentUser) {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'instruments', data.id);
+                    await setDoc(docRef, data);
+                } else {
+                    const idx = window.units.findIndex(u => u.id === data.id);
+                    if(idx >= 0) window.units[idx] = data; else window.units.push(data);
+                    window.filteredUnits = [...window.units];
+                    window.renderDashboard(); window.renderList();
+                }
+                window.closeModal(); window.navigateTo('units');
+            } catch (err) { console.error("Save Error:", err); }
+            finally { btn.innerText = originalText; btn.disabled = false; }
+        };
+
+        window.deleteUnit = async (id) => {
+            if (!confirm("Eliminar instrumento?")) return;
+            try {
+                if (window.isFirebaseInit && window.currentUser) {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'instruments', id);
+                    await deleteDoc(docRef);
+                } else {
+                    window.units = window.units.filter(u => u.id !== id);
+                    window.filteredUnits = [...window.units];
+                    window.renderDashboard(); window.renderList();
+                }
+            } catch (err) { console.error("Delete Error:", err); }
+        };
+
+        window.setChartMode = (m) => { window.chartMode = m; window.renderChart(); };
+        window.updateChartYear = (y) => { window.chartYear = parseInt(y); window.renderChart(); };
+        window.handleSearch = (t) => { 
+            window.filteredUnits = window.units.filter(u => (u.nome && u.nome.toLowerCase().includes(t.toLowerCase())) || (u.categoria && u.categoria.toLowerCase().includes(t.toLowerCase()))); 
+            window.renderList(); 
+        };
+        window.goBack = () => window.navigateTo('units');
+
+        window.syncWithDatabase = () => {
+            if (!window.currentUser) return;
+            const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'instruments');
+            return onSnapshot(collectionRef, (snapshot) => {
+                window.units = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                window.filteredUnits = [...window.units];
+                
+                // Atualizar filtro de instrumentos no Dashboard
+                const filterSelect = document.getElementById('dashboard-instrument-filter');
+                const currentVal = filterSelect.value;
+                const uniqueNames = [...new Set(window.units.map(u => u.nome))].sort();
+                filterSelect.innerHTML = '<option value="all">Todos os Instrumentos</option>' + 
+                    uniqueNames.map(name => `<option value="${name}" ${name === currentVal ? 'selected' : ''}>${name}</option>`).join('');
+
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) overlay.style.display = 'none';
+                
+                document.getElementById('connection-indicator').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                document.getElementById('connection-text').innerText = "Sincronizado";
+                document.getElementById('sync-info').innerText = "fiscal-23151 Online";
+
+                window.renderDashboard();
+                window.renderList();
+            }, (error) => {
+                console.error("Firestore Error:", error);
+                if (error.code === 'permission-denied') {
+                    document.getElementById('error-box').classList.remove('hidden');
+                }
+            });
+        };
+
+        const init = async () => {
+            lucide.createIcons();
+            window.populateYearSelects();
+            window.resetTempProjections();
+
+            const loaderTimeout = setTimeout(() => {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay && overlay.style.display !== 'none') {
+                    overlay.style.display = 'none';
+                    document.getElementById('connection-text').innerText = "Modo Local";
+                    document.getElementById('connection-indicator').classList.replace('bg-slate-500', 'bg-amber-500');
+                    window.renderDashboard();
+                }
+            }, 10000);
+
+            if (window.isFirebaseInit) {
+                try {
+                    let userCredential;
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        try { userCredential = await signInWithCustomToken(auth, __initial_auth_token); } 
+                        catch (e) { userCredential = await signInAnonymously(auth); }
+                    } else { userCredential = await signInAnonymously(auth); }
+
+                    onAuthStateChanged(auth, (user) => {
+                        window.currentUser = user;
+                        if (user) window.syncWithDatabase();
+                    });
+                } catch (e) { 
+                    console.error("Auth Error", e); 
+                    document.getElementById('loading-text').innerText = "Falha crítica de autenticação.";
+                }
+            }
+        };
+
+        window.onload = init;
+    </script>
+</body>
+</html>
