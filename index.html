@@ -13,18 +13,15 @@
         
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
 
-        /* Estilização da barra de rolagem customizada */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* Animações e Transições */
         .transition-all { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Contentores de Gráfico */
         .chart-container {
             position: relative;
             width: 100%;
@@ -33,11 +30,9 @@
             margin: 0 auto;
         }
 
-        /* Estilos de Tabela */
         .debited-month { background-color: #f1f5f9; color: #94a3b8; text-decoration: line-through; opacity: 0.7; }
         .chart-value-label { font-size: 8px; font-weight: 800; color: #64748b; margin-bottom: 4px; white-space: nowrap; }
 
-        /* Overlay de Carregamento */
         #loading-overlay {
             position: fixed; inset: 0; background: rgba(255, 255, 255, 0.98);
             backdrop-filter: blur(10px); z-index: 9999;
@@ -45,31 +40,27 @@
         }
 
         .kpi-card { @apply bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm transition-all hover:shadow-md; }
-        .action-badge { @apply px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-600 border border-slate-200 uppercase; }
     </style>
 </head>
 <body class="text-slate-900 antialiased overflow-hidden">
 
-    <!-- Chosen Palette: Strategical Indigo & High-Organization Slate -->
-    <!-- Application Structure Plan: 
-        1. Dashboard Global (Visão Geral): KPIs agregados de toda a base de dados.
-        2. Instrumentos (Agrupados): Organização por Contratada/Instrumento com detalhamento de frentes de trabalho.
-        3. Precisão Financeira: Motor de cálculo safeSum para garantir precisão absoluta de centavos.
-        4. Cloud: Persistência no projeto fiscal-23151.
+    <!-- Planificação de Ajuste Temporal Dinâmico:
+        1. Remoção de hardcoded CURRENT_MONTH.
+        2. Implementação de detecção automática de data (New Date()).
+        3. Recálculo automático de 'Debitado' considerando meses passados como encerrados.
     -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
 
     <!-- Ecrã de Carregamento -->
     <div id="loading-overlay">
         <div class="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
         <div class="text-center">
             <p id="loading-text" class="font-bold text-slate-800 text-lg tracking-tight uppercase text-center px-4">Sincronizando Plataforma SUGAT</p>
-            <p class="text-slate-400 text-xs mt-1">Ligar à base de dados fiscal-23151...</p>
+            <p class="text-slate-400 text-xs mt-1">Conectando ao projeto fiscal-23151...</p>
         </div>
     </div>
 
     <div class="min-h-screen flex">
-        <!-- Sidebar de Navegação -->
+        <!-- Sidebar -->
         <aside class="w-64 bg-slate-900 text-slate-400 hidden md:flex flex-col border-r border-slate-800 shrink-0">
             <div class="p-8">
                 <div class="flex flex-col gap-1 text-white mb-10">
@@ -92,38 +83,38 @@
                 </nav>
             </div>
             
-            <!-- Indicador de Status da Nuvem -->
             <div class="mt-auto p-8 border-t border-slate-800/50">
                 <div class="bg-slate-800/40 p-5 rounded-3xl border border-slate-700/30">
                     <p class="text-[10px] font-black text-slate-500 uppercase mb-3 text-center tracking-widest">Base de Dados</p>
                     <div class="flex items-center gap-3">
-                        <div id="connection-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-500 transition-colors"></div>
+                        <div id="connection-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-500"></div>
                         <div class="overflow-hidden">
                             <p id="connection-text" class="text-[10px] font-bold text-white uppercase truncate">Status</p>
-                            <p id="sync-info" class="text-[8px] text-slate-500 uppercase font-bold">Aguardando Auth</p>
+                            <p id="sync-info" class="text-[8px] text-slate-500 uppercase font-bold">fiscal-23151</p>
                         </div>
                     </div>
                 </div>
             </div>
         </aside>
 
-        <!-- Área Principal -->
+        <!-- Main Content -->
         <main class="flex-1 flex flex-col h-screen overflow-hidden">
             <header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-20">
                 <div class="flex items-center gap-4">
                     <button id="back-btn" onclick="window.goBack()" class="p-2 hover:bg-slate-100 rounded-xl text-slate-500 hidden transition-colors">
                         <i data-lucide="arrow-left" size="20"></i>
                     </button>
-                    <h2 id="header-title" class="text-xl font-black text-slate-800 tracking-tight uppercase">Painel de Controlo</h2>
+                    <div>
+                        <h2 id="header-title" class="text-xl font-black text-slate-800 tracking-tight uppercase">Painel de Controlo</h2>
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-4">
-                    <!-- Pesquisa: Visível apenas na aba Instrumentos -->
                     <div id="search-container" class="relative hidden lg:block">
                         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size="16"></i>
                         <input id="search-input" oninput="window.handleSearch(this.value)" type="text" placeholder="Pesquisar..." class="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs w-72 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium">
                     </div>
-                    <button onclick="window.openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg transition-all active:scale-95">
+                    <button onclick="window.openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95">
                         <i data-lucide="plus-circle" size="16"></i> Novo Registo
                     </button>
                 </div>
@@ -138,7 +129,7 @@
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
                             <div>
                                 <h3 class="text-xl font-black text-slate-800 tracking-tight text-indigo-600 uppercase">Fluxo de Desembolso Consolidado</h3>
-                                <p class="text-xs text-slate-400 mt-1 font-medium italic">Visão global de todos os contratos ativos na SUGAT</p>
+                                <p id="current-period-info" class="text-xs text-slate-400 mt-1 font-medium italic"></p>
                             </div>
                             <div class="flex bg-slate-100 p-1.5 rounded-2xl">
                                 <button onclick="window.setChartMode('annual')" id="btn-annual" class="px-5 py-2 rounded-xl text-[10px] font-black transition-all bg-white shadow-sm text-indigo-600 uppercase">Anual</button>
@@ -162,7 +153,7 @@
                                         <th class="px-10 py-6">Instrumento / Contratada</th>
                                         <th class="px-6 py-6 text-center">Status</th>
                                         <th class="px-6 py-6 text-center">Ação Orçamental</th>
-                                        <th class="px-6 py-6 text-right">Debitado (YTD)</th>
+                                        <th class="px-6 py-6 text-right">Debitado (Encerrado)</th>
                                         <th class="px-6 py-6 text-right">Budget Consolidado</th>
                                         <th class="px-10 py-6 text-center">Gestão</th>
                                     </tr>
@@ -186,7 +177,7 @@
             <div class="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                 <div>
                     <h2 id="modal-title" class="text-2xl font-black text-slate-800 tracking-tighter uppercase">Instrumento</h2>
-                    <p class="text-sm text-slate-500 font-medium italic">Dados sincronizados em tempo real.</p>
+                    <p class="text-sm text-slate-500 font-medium italic">Insira os valores com centavos para precisão total.</p>
                 </div>
                 <button onclick="window.closeModal()" class="p-3 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
                     <i data-lucide="x" size="24"></i>
@@ -242,20 +233,12 @@
                             <input id="form-ddo" type="text" oninput="window.handleCurrencyInput(this)" class="w-full pl-12 pr-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="0,00">
                         </div>
                     </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gestor Titular</label>
-                        <input id="form-resp" type="text" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Nome Completo">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gestor Substituto</label>
-                        <input id="form-sub-resp" type="text" class="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Nome Completo">
-                    </div>
                 </div>
 
                 <div id="step-2" class="space-y-10 hidden text-center">
                     <div class="flex items-center justify-between p-6 bg-indigo-50 border border-indigo-100 rounded-[24px] sticky top-0 z-10 shadow-sm">
                         <div class="flex-1 text-center">
-                            <p class="text-xs font-black uppercase tracking-widest text-indigo-900 mb-2">Ano para Lançamento:</p>
+                            <p class="text-xs font-black uppercase tracking-widest text-indigo-900 mb-2">Ano para Lançamento de Desembolsos:</p>
                             <select id="form-modal-year-select" onchange="window.changeModalEditingYear(this.value)" class="w-full md:w-48 px-5 py-3 bg-white border border-indigo-200 rounded-xl outline-none font-black text-indigo-600 focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm mx-auto block"></select>
                         </div>
                     </div>
@@ -273,13 +256,19 @@
         </div>
     </div>
 
-    <!-- Firebase SDK e Lógica da Aplicação -->
+    <div id="error-box" class="fixed top-8 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-4 rounded-2xl shadow-2xl z-[10000] hidden flex flex-col items-center gap-2">
+        <p class="font-bold uppercase tracking-widest text-xs">Erro de Permissão</p>
+        <p id="error-box-text" class="text-sm text-center">Verifique as regras do Firestore no Console do Firebase.</p>
+        <button onclick="this.parentElement.classList.add('hidden')" class="text-[10px] font-black underline mt-2">Fechar</button>
+    </div>
+
+    <!-- Firebase SDK Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // CONFIGURAÇÃO DO FIREBASE (fiscal-23151)
+        // CONFIGURAÇÃO FIREBASE (fiscal-23151)
         const firebaseConfig = {
             apiKey: "AIzaSyCUG2O3BXWBbaBH4CFLRq4HTk431kdWVp0",
             authDomain: "fiscal-23151.firebaseapp.com",
@@ -293,25 +282,27 @@
 
         const appId = 'sugat-territorial-cloud';
         let db, auth, mainChart;
+
+        // --- DETECÇÃO TEMPORAL DINÂMICA ---
+        const NOW = new Date();
+        const REAL_YEAR = NOW.getFullYear();
+        const REAL_MONTH_IDX = NOW.getMonth(); // 0 = Jan, 1 = Fev...
         
-        // --- ESTADO GLOBAL NO WINDOW ---
         window.units = [];
         window.filteredUnits = [];
         window.currentProjectionsEdit = {};
         window.currentView = 'dashboard';
         window.chartMode = 'annual';
-        window.chartYear = 2026;
+        window.chartYear = REAL_YEAR; // Começa no ano atual
         window.formStep = 1;
-        window.modalEditingYear = 2026;
+        window.modalEditingYear = REAL_YEAR;
         window.editingId = null;
         window.selectedUnit = null;
         window.currentUser = null;
         window.isFirebaseInit = false;
 
-        const YEARS = [2025, 2026, 2027, 2028, 2029, 2030];
+        const YEARS = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
         const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        const CURRENT_YEAR = 2026;
-        const CURRENT_MONTH_IDX = 0;
 
         const MAPPING = {
             "032/2013": "PROSUL PROJETOS SUPERVISAO E PLANEJAMENTO",
@@ -330,16 +321,18 @@
             const app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
+            
             window.isFirebaseInit = true;
         }
 
-        // --- MOTOR DE CÁLCULO DE ALTA PRECISÃO (SAFE SUM) ---
+        // --- MOTOR DE CÁLCULO DE ALTA PRECISÃO ---
         window.safeSum = (arr) => {
-            const sumInCents = arr.reduce((acc, val) => acc + Math.round((parseFloat(val) || 0) * 100), 0);
+            const sumInCents = arr.reduce((acc, val) => {
+                const fixedVal = parseFloat(parseFloat(val || 0).toFixed(2));
+                return acc + Math.round(fixedVal * 100);
+            }, 0);
             return sumInCents / 100;
         };
-
-        // --- FUNÇÕES DA INTERFACE ---
 
         window.populateYearSelects = function() {
             const ds = document.getElementById('chart-year-select');
@@ -353,7 +346,6 @@
         }
 
         window.formatBRL = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
-        window.formatBRLTable = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
         
         window.maskCurrency = (v) => {
             if (v === undefined || v === null || v === "") return "0,00";
@@ -421,17 +413,26 @@
                     const yrArr = u.projections[y] || Array(12).fill(0);
                     const yrT = window.safeSum(yrArr);
                     total = window.safeSum([total, yrT]);
-                    if(y < CURRENT_YEAR) debited = window.safeSum([debited, yrT]);
-                    else if(y === CURRENT_YEAR) {
-                        debited = window.safeSum([debited, window.safeSum(yrArr.slice(0, CURRENT_MONTH_IDX))]);
+                    
+                    // LÓGICA DE DÉBITO: Se o ano já passou, tudo é debitado. Se é o ano atual, meses passados são debitados.
+                    if(y < REAL_YEAR) {
+                        debited = window.safeSum([debited, yrT]);
+                    } else if(y === REAL_YEAR) {
+                        const passedMonths = yrArr.slice(0, REAL_MONTH_IDX);
+                        debited = window.safeSum([debited, window.safeSum(passedMonths)]);
                     }
                 });
             });
+
+            // Atualiza info de período
+            const monthName = MONTHS[REAL_MONTH_IDX];
+            document.getElementById('current-period-info').innerText = `Mês de Referência: ${monthName} ${REAL_YEAR} (Débito automático de meses encerrados)`;
+
             const uniqCount = new Set(window.units.map(u => u.nome)).size;
             const grid = document.getElementById('metrics-grid');
             if (grid) grid.innerHTML = `
                 <div class="kpi-card"><div class="p-3 rounded-2xl bg-slate-900 text-white w-max mb-4 shadow-lg"><i data-lucide="dollar-sign"></i></div><p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Budget Plurianual</p><p class="text-2xl font-black text-slate-900 mt-1">${window.formatBRL(total)}</p></div>
-                <div class="kpi-card border-rose-100 bg-rose-50/30"><div class="p-3 rounded-2xl bg-rose-600 text-white w-max mb-4 shadow-lg"><i data-lucide="arrow-down-to-dot"></i></div><p class="text-rose-600 text-xs font-bold uppercase tracking-widest">Total Debitado</p><p class="text-2xl font-black text-rose-900 mt-1">${window.formatBRL(debited)}</p></div>
+                <div class="kpi-card border-rose-100 bg-rose-50/30"><div class="p-3 rounded-2xl bg-rose-600 text-white w-max mb-4 shadow-lg"><i data-lucide="arrow-down-to-dot"></i></div><p class="text-rose-600 text-xs font-bold uppercase tracking-widest">Debitado (Histórico)</p><p class="text-2xl font-black text-rose-900 mt-1">${window.formatBRL(debited)}</p></div>
                 <div class="kpi-card border-emerald-100 bg-emerald-50/30"><div class="p-3 rounded-2xl bg-emerald-600 text-white w-max mb-4 shadow-lg"><i data-lucide="landmark"></i></div><p class="text-emerald-600 text-xs font-bold uppercase tracking-widest">Saldo Restante</p><p class="text-2xl font-black text-emerald-900 mt-1">${window.formatBRL(total - debited)}</p></div>
                 <div class="kpi-card"><div class="p-3 rounded-2xl bg-indigo-600 text-white w-max mb-4 shadow-lg"><i data-lucide="briefcase"></i></div><p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Instrumentos Únicos</p><p class="text-2xl font-black text-slate-900 mt-1">${uniqCount}</p></div>
             `;
@@ -467,7 +468,10 @@
                     datasets: [{
                         label: 'BRL',
                         data: dataPoints,
-                        backgroundColor: dataPoints.map((_, i) => (window.chartMode === 'annual' ? YEARS[i] < CURRENT_YEAR : (window.chartYear < CURRENT_YEAR || (window.chartYear === CURRENT_YEAR && i < CURRENT_MONTH_IDX))) ? '#cbd5e1' : '#4f46e5'),
+                        backgroundColor: dataPoints.map((_, i) => {
+                            const isPast = (window.chartMode === 'annual' ? YEARS[i] < REAL_YEAR : (window.chartYear < REAL_YEAR || (window.chartYear === REAL_YEAR && i < REAL_MONTH_IDX)));
+                            return isPast ? '#cbd5e1' : '#4f46e5';
+                        }),
                         borderRadius: 12
                     }]
                 },
@@ -515,9 +519,9 @@
                         const yrArr = u.projections[y] || Array(12).fill(0);
                         const yrT = window.safeSum(yrArr);
                         groupTotal = window.safeSum([groupTotal, yrT]);
-                        if (y < CURRENT_YEAR) groupDebited = window.safeSum([groupDebited, yrT]);
-                        else if (y === CURRENT_YEAR) {
-                            groupDebited = window.safeSum([groupDebited, window.safeSum(yrArr.slice(0, CURRENT_MONTH_IDX))]);
+                        if (y < REAL_YEAR) groupDebited = window.safeSum([groupDebited, yrT]);
+                        else if (y === REAL_YEAR) {
+                            groupDebited = window.safeSum([groupDebited, window.safeSum(yrArr.slice(0, REAL_MONTH_IDX))]);
                         }
                     });
                 });
@@ -536,7 +540,7 @@
                                 </div>
                                 <div class="flex items-center gap-12">
                                     <div class="text-right">
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Debitado Consolidado</p>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Debitado (Encerrado)</p>
                                         <p class="text-sm font-black text-rose-500 tracking-tighter">${window.formatBRL(groupDebited)}</p>
                                     </div>
                                     <div class="text-right">
@@ -555,9 +559,9 @@
                         const yrArr = u.projections[y] || Array(12).fill(0);
                         const yrT = window.safeSum(yrArr);
                         itemTotal = window.safeSum([itemTotal, yrT]);
-                        if (y < CURRENT_YEAR) itemDebited = window.safeSum([itemDebited, yrT]);
-                        else if (y === CURRENT_YEAR) {
-                            itemDebited = window.safeSum([itemDebited, window.safeSum(yrArr.slice(0, CURRENT_MONTH_IDX))]);
+                        if (y < REAL_YEAR) itemDebited = window.safeSum([itemDebited, yrT]);
+                        else if (y === REAL_YEAR) {
+                            itemDebited = window.safeSum([itemDebited, window.safeSum(yrArr.slice(0, REAL_MONTH_IDX))]);
                         }
                     });
                     const statusColor = u.status === 'Ativo' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700';
@@ -607,17 +611,21 @@
                 const yrArr = window.selectedUnit.projections[y] || Array(12).fill(0);
                 const yrT = window.safeSum(yrArr);
                 total = window.safeSum([total, yrT]);
-                if(y < CURRENT_YEAR) {
+                if(y < REAL_YEAR) {
                     debited = window.safeSum([debited, yrT]);
-                } else if(y === CURRENT_YEAR) {
-                    debited = window.safeSum([debited, window.safeSum(yrArr.slice(0, CURRENT_MONTH_IDX))]);
+                } else if(y === REAL_YEAR) {
+                    debited = window.safeSum([debited, window.safeSum(yrArr.slice(0, REAL_MONTH_IDX))]);
                 }
             });
             let tableRows = YEARS.map(year => {
                 const yrArr = window.selectedUnit.projections[year] || Array(12).fill(0);
-                let cells = yrArr.map((m, idx) => `<td class="text-right text-xs font-medium px-4 py-3 border-r border-slate-100 ${ (year < CURRENT_YEAR || (year === CURRENT_YEAR && idx < CURRENT_MONTH_IDX)) ? 'debited-month' : 'text-slate-600'}">${window.formatBRLTable(m)}</td>`).join('');
+                let cells = yrArr.map((m, idx) => {
+                    const isPast = (year < REAL_YEAR || (year === REAL_YEAR && idx < REAL_MONTH_IDX));
+                    return `<td class="text-right text-xs font-medium px-4 py-3 border-r border-slate-100 ${ isPast ? 'debited-month' : 'text-slate-600'}">${window.formatBRL(parseFloat(m || 0))}</td>`;
+                }).join('');
                 return `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="sticky left-0 bg-white z-10 px-6 py-4 font-black text-slate-800 border-r border-slate-200 text-left">${year}</td>${cells}<td class="text-right px-6 py-4 font-black text-indigo-600 bg-indigo-50/30">${window.formatBRL(window.safeSum(yrArr))}</td></tr>`;
             }).join('');
+            
             view.innerHTML = `
                 <div class="bg-white rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden mb-8 fade-in text-left">
                     <div class="bg-slate-900 p-12 text-white relative">
@@ -627,20 +635,33 @@
                                 <button onclick="window.openModal('${window.selectedUnit.id}')" class="flex items-center gap-2 px-4 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-[10px] font-bold uppercase transition-all ml-4"><i data-lucide="edit-3" size="14"></i> Editar</button></div>
                                 <h1 class="text-4xl font-black tracking-tighter uppercase mb-8 text-left">${window.selectedUnit.nome}</h1>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-slate-300 text-left">
-                                    <div class="font-bold text-xs flex items-center gap-2 uppercase tracking-widest leading-none border-l-4 border-rose-500 pl-3 py-1 text-left">Total Debitado: <span class="text-white ml-2 font-black">${window.formatBRLTable(debited)}</span></div>
-                                    <div class="font-bold text-xs flex items-center gap-2 uppercase tracking-widest leading-none border-l-4 border-emerald-500 pl-3 py-1 text-left">Saldo Restante: <span class="text-white ml-2 font-black">${window.formatBRLTable(total - debited)}</span></div>
-                                    <div class="font-bold text-[10px] flex items-center gap-2 uppercase tracking-widest border-t border-white/10 pt-4 text-left">Gerência: <span class="text-white ml-1 font-medium text-slate-100">${window.selectedUnit.gerencia || 'Não Definida'}</span></div>
+                                    <div class="font-bold text-xs flex items-center gap-2 uppercase tracking-widest leading-none border-l-4 border-rose-500 pl-3 py-1 text-left">Total Debitado (YTD): <span class="text-white ml-2 font-black">${window.formatBRL(debited)}</span></div>
+                                    <div class="font-bold text-xs flex items-center gap-2 uppercase tracking-widest leading-none border-l-4 border-emerald-500 pl-3 py-1 text-left">Saldo Futuro: <span class="text-white ml-2 font-black">${window.formatBRL(total - debited)}</span></div>
+                                    <div class="font-bold text-[10px] flex items-center gap-2 uppercase tracking-widest border-t border-white/10 pt-4 text-left">Contratada: <span class="text-white ml-1 font-medium text-slate-100">${window.selectedUnit.categoria}</span></div>
                                     <div class="font-bold text-[10px] flex items-center gap-2 uppercase tracking-widest border-t border-white/10 pt-4 text-left">Ação Orçamental: <span class="text-indigo-300 ml-1 font-black uppercase tracking-tight">${window.selectedUnit.acaoOrcamentaria}</span></div>
                                 </div>
                             </div>
                             <div class="bg-white/10 backdrop-blur-xl p-10 rounded-[32px] border border-white/10 text-right min-w-[280px]">
-                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Budget Consolidado</p>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Custo Total Plurianual</p>
                                 <p class="text-4xl font-black">${window.formatBRL(total)}</p>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden fade-in text-left"><div class="overflow-x-auto custom-scrollbar"><table class="w-full text-left projection-table border-collapse"><thead class="bg-slate-50/80 text-[10px] uppercase font-black text-slate-400 tracking-widest border-b"><tr><th class="sticky left-0 bg-slate-50 z-20 px-6 py-4 border-r border-slate-200 text-left">Ano</th>${MONTHS.map(m => `<th class="px-4 py-4 text-right border-r border-slate-100">${m}</th>`).join('')}<th class="px-6 py-4 text-right bg-indigo-50/50">Total</th></tr></thead><tbody>${tableRows}</tbody></table></div></div>`;
+                <div class="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden fade-in text-left">
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-left projection-table border-collapse">
+                            <thead class="bg-slate-50/80 text-[10px] uppercase font-black text-slate-400 tracking-widest border-b">
+                                <tr>
+                                    <th class="sticky left-0 bg-slate-50 z-20 px-6 py-4 border-r border-slate-200 text-left">Ano</th>
+                                    ${MONTHS.map(m => `<th class="px-4 py-4 text-right border-r border-slate-100">${m}</th>`).join('')}
+                                    <th class="px-6 py-4 text-right bg-indigo-50/50">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tableRows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
             lucide.createIcons();
         };
 
@@ -653,34 +674,25 @@
                 if (u) {
                     document.getElementById('form-name').value = u.nome; document.getElementById('form-cat').value = u.categoria;
                     document.getElementById('form-status').value = u.status; document.getElementById('form-action').value = u.acaoOrcamentaria; 
-                    
                     const ddoEl = document.getElementById('form-ddo');
                     if(ddoEl) ddoEl.value = window.maskCurrency((u.ddo || 0) * 100);
-                    
                     const mgEl = document.getElementById('form-management');
                     if(mgEl) mgEl.value = u.gerencia || "GEMAB";
-                    
                     const respEl = document.getElementById('form-resp');
                     if(respEl) respEl.value = u.responsavel || "";
-                    
                     const subEl = document.getElementById('form-sub-resp');
                     if(subEl) subEl.value = u.responsavelSub || "";
-
                     window.currentProjectionsEdit = JSON.parse(JSON.stringify(u.projections));
                 }
             } else {
                 document.getElementById('form-name').value = ''; document.getElementById('form-cat').value = '';
                 document.getElementById('form-ddo').value = '0,00'; document.getElementById('form-action').value = '';
-                
                 const mgEl = document.getElementById('form-management');
                 if(mgEl) mgEl.value = "GEMAB";
-                
                 const respEl = document.getElementById('form-resp');
                 if(respEl) respEl.value = "";
-                
                 const subEl = document.getElementById('form-sub-resp');
                 if(subEl) subEl.value = "";
-
                 window.resetTempProjections();
             }
             window.updateModalView();
@@ -708,7 +720,7 @@
             grid.innerHTML = MONTHS.map((m, idx) => `
                 <div class="space-y-2 text-center"><label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">${m}</label>
                 <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">R$</span>
-                <input type="text" oninput="window.handleMonthInput(${idx}, this)" class="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-center" value="${window.maskCurrency(data[idx] * 100)}"></div></div>`).join('');
+                <input type="text" oninput="window.handleMonthInput(${idx}, this)" class="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-center" value="${window.maskCurrency((data[idx] || 0) * 100)}"></div></div>`).join('');
         };
 
         window.changeModalEditingYear = (y) => { window.modalEditingYear = parseInt(y); window.renderMonthlyInputs(); };
@@ -781,7 +793,7 @@
                 
                 document.getElementById('connection-indicator').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
                 document.getElementById('connection-text').innerText = "Sincronizado";
-                document.getElementById('sync-info').innerText = "fiscal-23151 Online";
+                document.getElementById('sync-info').innerText = "Online";
 
                 window.renderDashboard();
                 window.renderList();
